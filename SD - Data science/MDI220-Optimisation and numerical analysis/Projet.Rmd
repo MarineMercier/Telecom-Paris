@@ -1,0 +1,307 @@
+---
+title: ' Projet MDI220 '
+author: "Télécom ParisTech - MDI220 - Marine Mercier"
+output:
+  html_document:
+    number_sections: yes
+    toc: yes
+  header-includes: \usepackage[french]{babel}
+  pdf_document:
+    number_sections: yes
+    toc: yes
+---
+Télechargement et affichage de la base de donnée discoveries :
+```{r}
+data(discoveries)
+require(graphics)
+plot(discoveries, ylab = "Number of important discoveries",type='h',
+     las = 1)
+```
+
+# Exercice 1
+## Question 1
+Nous considérons que le nombre de découvertes par an suit une loi géométrique :
+$$
+\ p_\theta  \big(x\big) =  \theta  \big(1- \theta \big)^{x} \
+$$ 
+On utilise la formule du maximum de vraisemblance, en consdérant les variables aléatoires comme indépendantes :
+$$
+\theta = max(\log p(X,t), t \in \mathopen{]}0\,;1\mathclose{[}) = max(\prod_{k=1}^n\log p_k(X_k,t), t \in \mathopen{]}0\,;1\mathclose{[})
+$$
+On cherche donc 
+$$
+\theta = max(\log( \prod_{k=1}^n \theta  \big(1- \theta \big)^{x_k} ))=n\log(\theta)+\log(1-\theta) \sum _{i=1}^n x_i
+$$
+Cette fonction est différentiable en ]0,1[ selon theta. En annulant la derivée selon theta on obtient le maximum de vraisemblance suivant : 
+$$
+\theta = \frac{1}{1 + \sum_{k=1}^{n} X_k*1/n}
+$$
+On calcule la valeur de l'estimateur:
+```{r}
+n = length(discoveries)
+max_vraisemblance_geo= 1/(1+sum(discoveries)/n)
+cat("theta =",max_vraisemblance_geo)
+
+plot(dgeom(discoveries,max_vraisemblance_geo),ylab="Probabilité",main="Probabilité selon loi géométrique")
+```
+
+## Question 2 
+On procède de la même façon dans cette question en supposant que le nombre de découvertes par an suit une loi de poisson :
+$$
+p_\lambda  \big(x\big) = e^{-\lambda} \frac{\lambda^{x}}{x!} 
+$$
+
+On obtient le maximum de vraisemblance suivant :
+$$\lambda = \frac{1}{n} * \sum_{k=1}^{n} X_k$$
+
+```{r}
+max_vraisemblance_poisson=sum(discoveries)/n
+cat("theta =",max_vraisemblance_poisson)
+plot(dpois(discoveries,max_vraisemblance_geo),ylab="Probabilité pour loi de poisson",main="Probabilité selon loi de poisson")
+```
+
+## Question 3
+On calcule les variances et esperances pour une loi géométrique et une loi de poisson 
+```{r}
+
+esperance_echantillon = mean(discoveries)
+variance_echantillon = var(discoveries)
+cat("Esperance de l'échantillon :",esperance_echantillon,"  Variance de l'échantilllon:",variance_echantillon)
+
+esperance_geo = (1 / max_vraisemblance_geo )
+variance_geo = (( 1 - max_vraisemblance_geo)/( max_vraisemblance_geo ^2))
+cat("Esperance pour une loi géométrique :",esperance_geo,"  Variance pour cette même loi:",variance_geo)
+
+esperance_poisson = max_vraisemblance_poisson
+variance_poisson = max_vraisemblance_poisson
+cat("Esperance pour une loi de poisson :",esperance_poisson,"  Variance pour cette même loi :",variance_poisson)
+```
+Le modèle de poisson semble le plus adapté à première vue. 
+
+## Question 4
+```{r}
+hist(discoveries,xlim=c(0,12),breaks=10,proba=TRUE,freq=FALSE,col="blue")
+density_geom=dgeom(seq(0,12,1),max_vraisemblance_geo)
+density_poisson=dpois(seq(0,12,1),max_vraisemblance_poisson)
+lines(seq(0,12,1),density_geom,col="red")
+lines(seq(0,12,1),density_poisson,col="green")
+legend(x="topright",legend=c("loi géométrique","loi de poisson"),col=c("red","green"),lty=1:1,cex=1)
+```
+
+La courbe de la loi de poisson est plus proche de l'histogramme, notre première impression semble confirmée. 
+
+## Question 5
+On trace le qqplot associé à la loi géométrique:
+```{r}
+loi_geom=qgeom(seq(0, 1, length.out = n) ,max_vraisemblance_geo)
+discoveries_sorted=sort(discoveries)
+plot(discoveries_sorted,loi_geom)
+lines(discoveries_sorted,discoveries_sorted)
+```
+
+On trace le qqplot associé à la loi de poisson :
+```{r}
+loi_poisson=qpois(seq(0, 1, length.out = n) ,max_vraisemblance_poisson)
+plot(discoveries_sorted,loi_poisson)
+lines(discoveries_sorted,discoveries_sorted)
+```
+
+Le tracé du qqplot de la loi de poisson semble plus proche de l'identité, la loi de poisson est donc plus appropriée. 
+
+## Question 6
+On vérifie qu'on ai n_j > 5 pour tout j :
+```{r}
+vecteur_n=c(sum(discoveries==0),sum(discoveries==1),sum(discoveries==2),sum(discoveries==3),sum(discoveries==4),sum(discoveries>4))
+vecteur_n
+```
+On effectue le partitionnement en k=6 parties du support de discoveries. Comme les modèles paramétriques de la loi géométrique et de la loi de poisson sont tous les deux de dimension 1, le degré de liberté vaut 5 dans les deux modèles.
+```{r}
+quantile=qchisq(0.95, 4)
+```
+
+On calcule S selon la loi géométrique, puis on le compare à quantile pour vérifier si S>quantile : 
+```{r}
+vecteur_geom=dgeom(seq(0,4,1),max_vraisemblance_geo)
+vecteur_geom=c(vecteur_geom,1-sum(vecteur_geom))
+
+somme_geo=0
+for (i in seq(1,6)){
+  res= somme_geo
+  somme_geo=res+((vecteur_n[i]-n*vecteur_geom[i])**2)/(n*vecteur_geom[i])
+}
+
+somme_geo<quantile
+```
+On rejette le modèle géométrique avec un niveau de confiance de 5%.
+
+On calcule S selon la loi de poisson, puis on le compare à quantile pour vérifier si S>quantile : 
+```{r}
+vecteur_poisson=dpois(seq(0,4,1),max_vraisemblance_poisson)
+vecteur_poisson=c(vecteur_poisson,1-sum(vecteur_poisson))
+
+somme_poisson=0
+for (i in seq(1,6)){
+  res= somme_poisson
+  somme_poisson=res+((vecteur_n[i]-n*vecteur_poisson[i])**2)/(n*vecteur_poisson[i])
+}
+
+somme_poisson<quantile
+```
+On accepte le modèle de poisson avec un niveau de confiance de 5%.
+
+
+# Exercice 2
+## Question 1 
+Les (Xi)i sont i.i.d de loi de Poisson de paramètre lambda. Par additivité de la loi de poisson on obtient :
+ $$
+ \sum_{i=1}^n X_i  \sim P(n \lambda )
+ $$
+On obtient donc :
+$$
+P_\lambda  \big(  \sum_{i=1}^n Xi  \geq s \big) = P_\lambda \big(   \bigcup_{i=plafond(s)}^{+ \infty } K=i   \cap  \sum_{i=1}^n Xi  \geq K \big) = \sum_{i=plafond(s)}^{+ \infty } \big( n\lambda \big)^{k} \frac{ e^{-n\lambda}}{k!} 
+$$
+On transforme la probabilité de l'union d'évènements en somme de probabilité car les évènements sont disjoints. En dérivant se résultat on obtient : 
+
+$$
+ \frac{\partial}{\partial \lambda}   \big( \sum_{i=plafond(s)}^{+ \infty } \big( n\lambda \big)^{k} \frac{ e^{-n\lambda}}{k!}\big) = \sum_{i=plafond(s)}^{+ \infty} \frac{\partial}{\partial \lambda} \big( n\lambda \big)^{k} \frac{ e^{-n\lambda}}{k!}=\sum_{i=plafond(s)}^{+ \infty} \big(\lambda^{k-1}n^{k} \frac{ e^{-n\lambda}}{k-1!} - \lambda^{k}n^{k+1} \frac{ e^{-n\lambda}}{k!}\big)
+$$
+En remarquant la série télescopique, on obtient :
+$$
+ \frac{\partial}{\partial \lambda}   \big( \sum_{i=plafond(s)}^{+ \infty } \big( n\lambda \big)^{k} \frac{ e^{-n\lambda}}{k!}\big) = n^{plafond(s)}\lambda^{plafond(s)-1} \frac{ e^{-n\lambda}}{\big(plafond(s)-1\big)!}
+$$
+La dérivée de la fonction est positive donc la fonction est croissante.
+
+## Question 2
+
+On étudie le rapport de vraisemblance monotone. Pour cela on doit vérifier que le problème respecte le critère MON.
+$$
+Soit \lambda  <  \mu :
+ \frac{p_\mu\big(x\big)}{p_\lambda \big(x\big)} =  \prod_{i=1}^n \big( \frac{\mu}{\lambda} \big)^X_i e^{-n\big(\mu-\lambda\big)} =e^{-n\big(\mu-\lambda\big) +Tlog\big(\frac{\mu}{\lambda}\big)}
+$$
+On obtient bien une fonction strictement croissante de T.
+Ainsi pour lambda=3 on a :
+
+$$
+P_{\lambda=3} \big( T\big(X\big) >s\big) \leq\alpha 
+$$
+
+
+Avec $$T\big(X\big) \sim P(3n)$$ et $$s=q_{1-\alpha}$$
+On calcule s :
+
+```{r}
+s = qpois(0.95, 3*n)
+s
+```
+
+## Question 3
+Si T>s on rejette l'hypothèse nulle Ho:
+```{r}
+sum(discoveries)>s
+```
+On accepte donc l'hypothèe nulle.
+
+## Question 4
+On rejette le tes si T(X)>s, en approximant T(X) par nm. 
+On veut donc $$n_{min} m >s$$ soit : $$n_{min}= plafond\big( \frac{s}{m} \big)$$
+
+
+```{r}
+m=mean(discoveries)
+min=ceiling(s/m)
+min
+
+```
+
+## Question 5
+$$
+ \beta \big( \lambda \big) =1-P_\lambda \big(Accepter à tort Ho\big)=1-P_\lambda \big(T<s\big)=P_\lambda(T \geq s)
+$$
+Avec T suivant une loi de poisson de paramètre 3n par additivité de la loi de poisson car les (Xi)i sont identiquement déterminées et indépendantes. 
+```{r}
+beta = function(l){
+  1-ppois(s,100*l)
+}
+
+lambda=seq(3,4,0.1)
+Beta=lapply(lambda,FUN='beta')
+plot(lambda,Beta,type='line',main="Fonction B en fonction de lambda")
+
+```
+
+On procède de la même façon pour tracer Beta en fonction du nombre de données quand lambda est fixé. 
+
+```{r}
+beta = function(nb){
+  1-ppois(s,nb*3.5)
+}
+
+nombre_de_donnees=seq(60,150,1)
+Beta=lapply(nombre_de_donnees,FUN='beta')
+plot(nombre_de_donnees,Beta,type='line',main="fonction B en fonction de n")
+
+```
+
+On examine alors à parir de quelle valeur beta dépasse 0,9. Voici le nombre de données nécessaire :
+```{r}
+i=1
+while (Beta[i]<0.9){
+  i=i+1}
+nombre_de_donnees[i]
+```
+
+
+# Exercice 3
+## Question 1 
+On peut approximer $$ \lambda \sim \Gamma \big(k,\theta\big)$$
+Comme $$E\big(\lambda\big)=k\theta$$ et $$Var\big(\lambda\big)=k\theta^2$$, les conditions sur lambda imposent 
+$$\big(k,\theta\big)=\big(20,0.25\big)$$
+
+## Question 2
+On a  : 
+$$p(\lambda|x)=\frac{p(x|\lambda)p(\lambda)}{p(x)}$$
+Comme lambda suit une loi Gamma, et x sachant lambda suit une loi de poisson, on obtient :
+$$
+p(\lambda|x)= \frac{\lambda^{ \sum_{k=1}^nx_k+k-1}*e^{-\lambda(n+\theta^{-1})}}{\theta^k\Gamma(k)}*\frac{1}{\int_{}^{}\lambda'^{ \sum_{k=1}^nx_k+k-1}*e^{-\lambda'(n+\theta^{-1})}d\lambda'}
+$$
+On retrouve bien un loi gamma:
+$$
+p(\lambda|x)\propto \lambda^{ \sum_{k=1}^nx_k+k-1}*e^{-\lambda(n+\theta^{-1})}
+$$
+Lambda suit donc une loi $$\Gamma(\sum_{k=1}^nx_k+k , \frac{\theta}{n\theta
++1})$$.
+Ainsi : 
+$$E\big(\lambda\big)=k\theta=\frac{\sum_{k=1}^nx_k+k}{n+\theta^{-1}}$$
+Tandis que l'estimateur du maximum de vraisemblance vaut : $$\frac{1}{n} * \sum_{k=1}^{n} X_k$$. La somme et le denominateur sont tous deux corrigés.
+
+## Question 3
+k vaut :
+```{r}
+k = 0.25 + sum(discoveries)
+k
+```
+
+Theta vaut :
+```{r}
+theta = 1/(n + 1/20)
+theta
+```
+
+Et l'espérance vaut :
+```{r}
+esperance_posteriori = k * theta
+esperance_posteriori
+```
+
+## Question 4
+La fonction de répartition à postériori : $$F_\lambda\big(x\big)=P\big(x\geq \lambda )$$
+On choisit : $$I=[F^{-1}\big(\frac{1-\alpha}{2}\big),F^{-1}\big(\frac{1+\alpha}{2}\big)]$$, on a donc :
+$$P\big(\lambda \in I|x \big)=\alpha$$
+Calculons l'intervalle I pour le niveau : $$\alpha=0.95$$
+```{r}
+alpha = 0.95
+borne_inf = qgamma( (1-alpha)/2 ,shape = k, scale = theta) 
+borne_sup = qgamma( (1+alpha)/2 ,shape = k, scale = theta)
+cat("I=[",borne_inf,borne_sup,"]")
+```
+
